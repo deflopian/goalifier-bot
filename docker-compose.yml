@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      target: app
+      args: &APP_BUILD_ARGS
+        NODE_VERSION_ARG: ${NODE_VERSION}
+    restart: on-failure
+    networks:
+      default:
+      server_network:
+        aliases:
+          - ${COMPOSE_PROJECT_NAME}_app
+    depends_on:
+      - db
+    ports:
+      - "8082:3000"
+    env_file: &APP_ENVS
+      - .env
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}_app.rule=Host(`${HOST_DOMAIN}`) && PathPrefix(`/api/`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}_app.entrypoints=webSecure"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}_app.service=${COMPOSE_PROJECT_NAME}_app"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}_app.tls.certresolver=doDNSChallenge"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}_app.middlewares=hstsHeader@file,secHeader@file"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}_app.loadbalancer.server.scheme=http"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}_app.loadbalancer.server.port=3000  "
+      - "traefik.docker.network=${SERVER_NETWORK_NAME}"
+    volumes:
+      - app_uploads:/var/www/app/uploads:rw
+      - app_logs:/var/www/app/logs:rw
+      - web_log:/var/log/nginx:rw
+
+  db:
+    image: mongo:${MONGO_VERSION}
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      TZ: ${TZ}
+      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+    labels:
+      - "traefik.enable=false"
+    volumes:
+      - db_config:/data/configdb:rw
+      - db_data:/data/db:rw
+
+volumes:
+  web_log:
+  app_uploads:
+  app_logs:
+  db_config:
+  db_data:
+
+networks:
+  default:
+  server_network:
+    external: true
+    name: ${SERVER_NETWORK_NAME}

@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  backend:
+    image: node:${NODE_VERSION}-alpine
+    command: /bin/sh -c "npm install && npm run dev"
+    restart: on-failure
+    ports:
+      - "${HOST_API_PORT}:3000"
+    env_file: &APP_ENVS
+      - .env
+    environment:
+      NODE_ENV: development
+    depends_on:
+      - db
+    volumes:
+      - .:/var/www/app
+    working_dir: /var/www/app
+
+  db:
+    image: mongo:${MONGO_VERSION}
+    restart: unless-stopped
+    ports:
+      - "${MONGO_PORT:-27017}:27017"
+    environment:
+      TZ: ${TZ}
+      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+    volumes:
+      - db_config:/data/configdb:rw
+      - db_data:/data/db:rw
+
+volumes:
+  db_config:
+  db_data:
