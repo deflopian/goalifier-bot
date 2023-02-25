@@ -468,41 +468,39 @@ export class TelegramBotWrapper {
   }
 
   private getGoalsList (goals: IGoal[], current: number, maxpage: number) {
-    const keys: object[][] = []
+    const keys: string[][] = []
     for (let i = 0; i < goals.length; i++) {
       if (i % 2 === 0) {
         keys.push([])
       }
-      keys[keys.length - 1].push({
-        text: goals[i].title?.length > 50 ? goals[i].title.substring(0, 50) + '...' : goals[i].title,
-        callback_data: `goals-list-item_${goals[i].customID}`,
-      })
+      // keys[keys.length - 1].push({
+      //   text: goals[i].title?.length > 50 ? goals[i].title.substring(0, 50) + '...' : goals[i].title,
+      //   callback_data: `goals-list-item_${goals[i].customID}`,
+      // })
+      keys[keys.length - 1].push(goals[i].customID + ': ' + (goals[i].title?.length > 50 ? goals[i].title.substring(0, 50) + '...' : goals[i].title))
     }
 
-    const controls: { text: string, callback_data: string }[] = []
-    if (current > 1) {
-      controls.push({
-        text: '«',
-        callback_data: `goals-list-page_${current - 1}`,
-      })
-    }
-    if (current < maxpage) {
-      controls.push({
-        text: `${maxpage}»`,
-        callback_data: `goals-list-page_${current + 1}`,
-      })
-    }
-    if (controls.length > 0) {
-      keys.push(controls)
-    }
+    // const controls: { text: string, callback_data: string }[] = []
+    // if (current > 1) {
+    //   controls.push({
+    //     text: '«',
+    //     callback_data: `goals-list-page_${current - 1}`,
+    //   })
+    // }
+    // if (current < maxpage) {
+    //   controls.push({
+    //     text: `${maxpage}»`,
+    //     callback_data: `goals-list-page_${current + 1}`,
+    //   })
+    // }
+    // if (controls.length > 0) {
+    //   keys.push(controls)
+    // }
 
     return {
-      reply_markup: {
-        keyboard: {
-          rows: keys,
-          single_use: true,
-        },
-      },
+      reply_markup: JSON.stringify({
+        keyboard: keys,
+      }),
     }
   }
 
