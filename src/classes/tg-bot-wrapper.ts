@@ -65,6 +65,7 @@ export class TelegramBotWrapper {
       console.error('Bot is not running')
       return
     }
+    console.log(options)
     const botMessage = await this.bot.sendMessage(chatId, message, options)
     if (botMessage) {
       await this.logMessage(chatId, botMessage.message_id, botMessage.text as string, null, null)
@@ -468,16 +469,16 @@ export class TelegramBotWrapper {
   }
 
   private getGoalsList (goals: IGoal[], current: number, maxpage: number) {
-    const keys: string[][] = []
+    const keys: object[][] = []
     for (let i = 0; i < goals.length; i++) {
       if (i % 2 === 0) {
         keys.push([])
       }
-      // keys[keys.length - 1].push({
-      //   text: goals[i].title?.length > 50 ? goals[i].title.substring(0, 50) + '...' : goals[i].title,
-      //   callback_data: `goals-list-item_${goals[i].customID}`,
-      // })
-      keys[keys.length - 1].push(goals[i].customID + ': ' + (goals[i].title?.length > 50 ? goals[i].title.substring(0, 50) + '...' : goals[i].title))
+      keys[keys.length - 1].push({
+        text: goals[i].title?.length > 50 ? goals[i].title.substring(0, 50) + '...' : goals[i].title,
+        // callback_data: `goals-list-item_${goals[i].customID}`,
+      })
+      // keys[keys.length - 1].push(goals[i].customID + ': ' + (goals[i].title?.length > 50 ? goals[i].title.substring(0, 50) + '...' : goals[i].title))
     }
 
     // const controls: { text: string, callback_data: string }[] = []
