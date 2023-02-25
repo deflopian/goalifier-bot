@@ -303,6 +303,7 @@ export class TelegramBotWrapper {
       goal.title = msg.text.length > 100 ? msg.text.substring(0, 100) + '...' : msg.text
       goal.customID = nanoid(16)
       goal.description = ''
+      goal.createdAt = new Date()
       goal.from = new Date()
 
       const date = new Date()
