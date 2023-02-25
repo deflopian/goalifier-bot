@@ -498,9 +498,11 @@ export class TelegramBotWrapper {
     // }
 
     return {
-      reply_markup: JSON.stringify({
+      reply_markup: {
+        resize_keyboard: true,
+        one_time_keyboard: true,
         keyboard: keys,
-      }),
+      },
     }
   }
 
