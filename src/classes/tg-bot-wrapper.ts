@@ -177,7 +177,7 @@ export class TelegramBotWrapper {
     this.botContext?.setContext(chatId, TGContextTypes.WAITING_FOR_ACHIEVEMENT_GOAL_SELECTION)
 
     const keyboard = await this.drawGoalKeyboard(user._id, 1)
-    console.log(keyboard)
+    console.log(keyboard.reply_markup.inline_keyboard)
     const options = Object.assign({ parse_mode: 'HTML' as ParseMode }, keyboard)
     this.sendL10NMessage(msg, L10nTypes.ACHIEVEMENTS_CREATION_WAITING_FOR_GOAL, options)
   }
