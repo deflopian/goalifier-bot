@@ -10,8 +10,10 @@ import { Goal } from '../models/goal.model'
 import TG_COMMANDS from '../utils/tg-commands.enum'
 import { TGChat } from '../models/tg-chat.model'
 import { GoalModel, IGoal } from '../interfaces/models/goal.interface'
-import { nanoid } from 'nanoid'
+import { customAlphabet } from 'nanoid'
 import mongoose from 'mongoose'
+
+const getRandID = customAlphabet('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-0123456789', 16)
 
 const ObjectId = mongoose.Schema.Types.ObjectId
 
@@ -302,7 +304,7 @@ export class TelegramBotWrapper {
     if (this.botContext?.is(chatId, TGContextTypes.WAITING_FOR_GOAL_TITLE)) {
       const goal = new Goal()
       goal.title = msg.text.length > 100 ? msg.text.substring(0, 100) + '...' : msg.text
-      goal.customID = nanoid(16)
+      goal.customID = getRandID(16)
       goal.description = ''
       goal.user = user._id
       goal.createdAt = new Date()
