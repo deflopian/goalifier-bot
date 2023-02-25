@@ -5,5 +5,4 @@ do
   sleep 5
 done
 
-npm run build
 npm run start
