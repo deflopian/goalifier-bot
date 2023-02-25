@@ -489,7 +489,9 @@ export class TelegramBotWrapper {
         callback_data: `goals-list-page_${current + 1}`,
       })
     }
-    keys.push(controls)
+    if (controls.length > 0) {
+      keys.push(controls)
+    }
 
     return {
       reply_markup: {
