@@ -493,7 +493,7 @@ export class TelegramBotWrapper {
 
     return {
       reply_markup: {
-        inline_keyboard: keys,
+        keyboard: keys,
       },
     }
   }
