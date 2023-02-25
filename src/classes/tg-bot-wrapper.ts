@@ -184,17 +184,7 @@ export class TelegramBotWrapper {
     const options = Object.assign(keyboard, { reply_to_message_id: msg.message_id })
     console.log(options)
 
-    const opts = {
-      reply_to_message_id: msg.message_id,
-      reply_markup: JSON.stringify({
-        keyboard: [
-          ['Yes, you are the bot of my life ❤'],
-          ['No, sorry there is another one...'],
-        ],
-      }),
-    }
-
-    this.sendL10NMessage(msg, L10nTypes.ACHIEVEMENTS_CREATION_WAITING_FOR_GOAL, opts)
+    this.sendL10NMessage(msg, L10nTypes.ACHIEVEMENTS_CREATION_WAITING_FOR_GOAL, {}, options)
   }
 
   private getLang(msg: TelegramBot.Message) {
