@@ -24,25 +24,24 @@ export class TelegramBotWrapper {
   private botContext: TGContext | null = null
 
   constructor() {
-    if (host && token) {
-      try {
-        this.botContext = new TGContext()
-        this.bot = new TelegramBot(token)
+    console.log('bot started with webhook:', `https://${host}/api/bots/bot${token}`)
+    try {
+      this.botContext = new TGContext()
+      this.bot = new TelegramBot(token)
 
-        if (this.bot) {
-          this.bot.setWebHook(`https://${host}/api/bots/bot${token}`)
+      if (this.bot) {
+        this.bot.setWebHook(`https://${host}/api/bots/bot${token}`)
 
-          this.bot.onText(/\/start(.*)/, this.onStart.bind(this)) // TG_COMMANDS.START
-          this.bot.onText(/\/goals(.*)/, this.getGoals.bind(this)) // TG_COMMANDS.GOALS
-          this.bot.onText(/\/progress(.*)/, this.getGoalProgress.bind(this)) // TG_COMMANDS.PROGRESS
-          this.bot.on('callback_query', this.onCallbackQuery.bind(this)) // TG_COMMANDS.PARCELS
-          this.bot.on('message', this.onMessage.bind(this))
-        }
-      } catch (error) {
-        console.log(error)
-        this.bot = null
-        this.botContext = null
+        this.bot.onText(/\/start(.*)/, this.onStart.bind(this)) // TG_COMMANDS.START
+        this.bot.onText(/\/goals(.*)/, this.getGoals.bind(this)) // TG_COMMANDS.GOALS
+        this.bot.onText(/\/progress(.*)/, this.getGoalProgress.bind(this)) // TG_COMMANDS.PROGRESS
+        this.bot.on('callback_query', this.onCallbackQuery.bind(this)) // TG_COMMANDS.PARCELS
+        this.bot.on('message', this.onMessage.bind(this))
       }
+    } catch (error) {
+      console.log(error)
+      this.bot = null
+      this.botContext = null
     }
   }
 

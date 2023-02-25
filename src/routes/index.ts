@@ -1,9 +1,10 @@
 import { Router } from 'express'
 import { logger } from '../utils/logger.helper'
+import bots from './bot.route'
 
 const router = Router()
 
-import bots from './bot.route'
+console.log('router initing...')
 
 router.use('/api/bots', bots)
 
