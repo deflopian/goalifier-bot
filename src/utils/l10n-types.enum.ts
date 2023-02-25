@@ -9,6 +9,8 @@ enum L10nTypes {
   GOALS_CREATION_WAITING_FOR_TILL = 'goals_creation_waiting_for_till',
   GOALS_CREATION_SUCCESS = 'goals_creation_success',
   ACHIEVEMENTS_CREATION_SUCCESS = 'achievements_creation_success',
+  ACHIEVEMENTS_CREATION_WAITING_FOR_TEXT = 'achievements_waiting_for_text',
+  ACHIEVEMENTS_CREATION_WAITING_FOR_GOAL = 'achievements_waiting_for_goal',
 
   START_GREETINGS = 'start_greeting',
   START_EXISTED_GREETINGS = 'start_existed_greeting',

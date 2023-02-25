@@ -1,11 +1,11 @@
 import { Request } from 'express'
 import { Document, Model, PopulatedDoc, Types } from 'mongoose'
-import { IGoal, IGoalMethods } from './goal.interface'
+import { GoalModel } from './goal.interface'
 
 export interface IUser {
   _id: Types.ObjectId
   username: string | null
-  goals: (Types.ObjectId | IGoal | IGoalMethods)[]
+  goals: (Types.ObjectId | GoalModel)[]
   chatId: number | null
   createdAt: Date
   updatedAt: Date

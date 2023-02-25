@@ -14,6 +14,8 @@ messages[Languages.RU][L10nTypes.START_EXISTED_GREETINGS] = 'С возвраще
 messages[Languages.RU][L10nTypes.ACHIEVEMENTS_NOT_FOUND] = 'У вас всё впереди!'
 messages[Languages.RU][L10nTypes.ACHIEVEMENTS_LIST_LABEL] = 'Вы достигли немалого прогресса:'
 messages[Languages.RU][L10nTypes.ACHIEVEMENTS_CREATION_SUCCESS] = 'Прекрасное достижение!'
+messages[Languages.RU][L10nTypes.ACHIEVEMENTS_CREATION_WAITING_FOR_TEXT] = 'Чудесно! Что вы сделали сегодня?'
+messages[Languages.RU][L10nTypes.ACHIEVEMENTS_CREATION_WAITING_FOR_GOAL] = 'Для какой цели вы хотите записать достижение?'
 
 messages[Languages.RU][L10nTypes.GOAL_NOT_FOUND] = 'Я не могу найти эту цель, это очень странно.'
 messages[Languages.RU][L10nTypes.GOALS_NOT_FOUND] = 'Вы ещё не установили ни одной цели.'

@@ -1,4 +1,4 @@
-import { IGoal, IGoalMethods } from '../interfaces/models/goal.interface'
+import { IGoal } from '../interfaces/models/goal.interface'
 import TGContextTypes from '../utils/tg-context-types.enum'
 
 export class TGContext {
@@ -22,11 +22,11 @@ export class TGContext {
     this.contextByChat[chatId] = null
   }
 
-  setActiveGoal (chatId: number, goal: IGoal & IGoalMethods): void {
+  setActiveGoal (chatId: number, goal: IGoal): void {
     this.goalByChat[chatId] = goal
   }
 
-  getActiveGoal(chatId: number): IGoal & IGoalMethods | null {
+  getActiveGoal(chatId: number): IGoal | null {
     return this.goalByChat[chatId] || null
   }
 

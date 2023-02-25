@@ -9,14 +9,17 @@ import TGContextTypes from '../utils/tg-context-types.enum'
 import { Goal } from '../models/goal.model'
 import TG_COMMANDS from '../utils/tg-commands.enum'
 import { TGChat } from '../models/tg-chat.model'
-import { IGoal } from '../interfaces/models/goal.interface'
+import { GoalModel, IGoal } from '../interfaces/models/goal.interface'
+import { nanoid } from 'nanoid'
+import mongoose from 'mongoose'
+
+const ObjectId = mongoose.Schema.Types.ObjectId
 
 type ParseMode = 'Markdown' | 'MarkdownV2' | 'HTML'
 
 const token = process.env.TG_TOKEN || ''
 const host = process.env.TG_HOST || ''
 const logChatId = process.env.TG_CHAT_ID || '0'
-const discussionChatId = process.env.TG_PRIVATE_ID || '0'
 
 export class TelegramBotWrapper {
   private bot: TelegramBot | null = null
@@ -34,6 +37,8 @@ export class TelegramBotWrapper {
 
         this.bot.onText(/\/start(.*)/, this.onStart.bind(this)) // TG_COMMANDS.START
         this.bot.onText(/\/goals(.*)/, this.getGoals.bind(this)) // TG_COMMANDS.GOALS
+        this.bot.onText(/\/create(.*)/, this.createGoal.bind(this)) // TG_COMMANDS.GOALS
+        this.bot.onText(/\/log(.*)/, this.addProgress.bind(this)) // TG_COMMANDS.GOALS
         this.bot.onText(/\/progress(.*)/, this.getGoalProgress.bind(this)) // TG_COMMANDS.PROGRESS
         this.bot.on('callback_query', this.onCallbackQuery.bind(this)) // TG_COMMANDS.PARCELS
         this.bot.on('message', this.onMessage.bind(this))
@@ -113,10 +118,7 @@ export class TelegramBotWrapper {
   private async getGoalProgress(msg, match) {
     const chatId = msg.chat.id
     this.botContext?.clearContext(chatId)
-    const user = await this.getUserByChatID(chatId)
-    if (!user) {
-      return
-    }
+    const user = await this.getUserByChatID(chatId, msg.chat.username)
 
     await user.populate('goals')
     const goalId: string = msg.text
@@ -155,6 +157,30 @@ export class TelegramBotWrapper {
     this.sendMessage(msg.chat.id, message, options)
   }
 
+  private async createGoal(msg, match) {
+    const chatId = msg.chat.id
+    this.botContext?.clearContext(chatId)
+    const user = await this.getUserByChatID(chatId, msg.chat.username)
+    if (!user) {
+      return
+    }
+
+    this.botContext?.setContext(chatId, TGContextTypes.WAITING_FOR_GOAL_TITLE)
+    this.sendL10NMessage(msg.chat.id, L10nTypes.GOALS_CREATION_WAITING_FOR_TITLE, { parse_mode: 'HTML' as ParseMode })
+  }
+
+  private async addProgress(msg, match) {
+    const chatId = msg.chat.id
+    this.botContext?.clearContext(chatId)
+    const user = await this.getUserByChatID(chatId, msg.chat.username)
+
+    this.botContext?.setContext(chatId, TGContextTypes.WAITING_FOR_ACHIEVEMENT_GOAL_SELECTION)
+
+    const keyboard = this.drawGoalKeyboard(user._id, 1)
+    const options = Object.assign({ parse_mode: 'HTML' as ParseMode }, keyboard)
+    this.sendL10NMessage(msg.chat.id, L10nTypes.ACHIEVEMENTS_CREATION_WAITING_FOR_GOAL, options)
+  }
+
   private getLang(msg: TelegramBot.Message) {
     const tgLang = msg.from?.language_code || Languages.RU
     console.log('language_code: ', msg.from?.language_code)
@@ -171,6 +197,33 @@ export class TelegramBotWrapper {
     return language
   }
 
+  private async drawGoalKeyboard(userId: object, pageNumber: number) {
+    const goals = await Goal.find({
+      user: userId,
+      deleted: false,
+    })
+    const itemsCount = goals.length
+
+    return this.getGoalsList(goals.slice((pageNumber - 1) * 4, pageNumber * 4), pageNumber, Math.ceil(itemsCount / 4))
+  }
+
+  private async setContextGoalForAchievment(msg, userId: object, goalCustomID: string) {
+    const goal = await Goal.findOne({
+      user: userId,
+      customID: goalCustomID,
+      deleted: false,
+    })
+
+    if (!goal) {
+      this.sendL10NMessage(msg, L10nTypes.GOAL_NOT_FOUND, {}, { parse_mode: 'HTML' as ParseMode })
+      return
+    }
+
+    this.botContext?.setActiveGoal(msg.chat.id, goal)
+    this.botContext?.setContext(msg.chat.id, TGContextTypes.WAITING_FOR_ACHIEVEMENT)
+    this.sendL10NMessage(msg, L10nTypes.ACHIEVEMENTS_CREATION_WAITING_FOR_TEXT, {}, { parse_mode: 'HTML' as ParseMode })
+  }
+
   private async onCallbackQuery(messageInfo) {
     if (!messageInfo?.message) {
       console.log(messageInfo)
@@ -178,9 +231,24 @@ export class TelegramBotWrapper {
       return
     }
     const chatId = messageInfo.message.chat.id
-    const user = await this.getUserByChatID(chatId)
+    const user = await this.getUserByChatID(chatId, messageInfo?.message?.chat?.username)
     if (!user) {
       return
+    }
+    const msg = messageInfo.message
+    const btnData = messageInfo.data || 'goals_1'
+    const parts = btnData.split('_')
+    const type = parts[0] || 'goals'
+    const pageNumber = parseInt(parts[1])
+    let keyboard: object = {}
+
+    if (this.botContext?.is(chatId, TGContextTypes.WAITING_FOR_ACHIEVEMENT_GOAL_SELECTION)) {
+      if (type === 'goals-list-page') {
+        keyboard = await this.drawGoalKeyboard(user._id, pageNumber)
+      } else if (type === 'goals-list-item') {
+        this.setContextGoalForAchievment(msg, user._id, parts[1])
+        return
+      }
     }
 
     const goal = this.botContext?.getActiveGoal(chatId)
@@ -190,26 +258,24 @@ export class TelegramBotWrapper {
 
     let itemsCount = 0
 
-    const msg = messageInfo.message
-    const btnData = messageInfo.data || 'goals_1'
-    const parts = btnData.split('_')
-    const type = parts[0] || 'goals'
-    const pageNumber = parseInt(parts[1])
     const language = this.getLang(msg)
 
     let message = ''
+
     if (type === 'achievements') {
       itemsCount = goal.achievements.length
       message = await this.getAchievementsListMessage(goal, pageNumber, language)
-    } else {
+      keyboard = this.getPagination(pageNumber, Math.ceil(itemsCount / 10), type)
+    } else if (type === 'goals') {
       itemsCount = await Goal.count({
         user: user._id,
         deleted: false,
       })
       message = await this.getGoalsListMessage(user, pageNumber, language)
+      keyboard = this.getPagination(pageNumber, Math.ceil(itemsCount / 10), type)
     }
 
-    const editOptions = Object.assign({ parse_mode: 'HTML' as ParseMode }, this.getPagination(pageNumber, Math.ceil(itemsCount / 10), type), { chat_id: msg.chat.id, message_id: msg.message_id})
+    const editOptions = Object.assign({ parse_mode: 'HTML' as ParseMode }, keyboard, { chat_id: msg.chat.id, message_id: msg.message_id})
     this.bot?.editMessageText(message, editOptions)
   }
 
@@ -224,7 +290,7 @@ export class TelegramBotWrapper {
       }
     })
 
-    const user = await this.getUserByChatID(chatId)
+    const user = await this.getUserByChatID(chatId, msg.chat.username)
     const lang = this.getLang(msg)
     await this.logMessage(chatId, msg.message_id, msg.text || '', user, commandInMessage)
 
@@ -235,6 +301,7 @@ export class TelegramBotWrapper {
     if (this.botContext?.is(chatId, TGContextTypes.WAITING_FOR_GOAL_TITLE)) {
       const goal = new Goal()
       goal.title = msg.text.length > 100 ? msg.text.substring(0, 100) + '...' : msg.text
+      goal.customID = nanoid(16)
       goal.description = ''
       goal.from = new Date()
 
@@ -247,6 +314,7 @@ export class TelegramBotWrapper {
       this.botContext?.setActiveGoal(chatId, goal)
 
       this.sendL10NMessage(msg, L10nTypes.GOALS_CREATION_WAITING_FOR_DESCRIPTION, {})
+      this.bot?.sendMessage(logChatId, `Пользователь ${user.username} (${chatId}) создал новую цель "${goal.title}" (${goal._id})`)
     } else if (this.botContext?.is(chatId, TGContextTypes.WAITING_FOR_GOAL_DESCRIPTION)) {
       const goal = this.botContext?.getActiveGoal(chatId)
       if (!goal) {
@@ -300,6 +368,7 @@ export class TelegramBotWrapper {
       await goal.save()
 
       this.sendL10NMessage(msg, L10nTypes.ACHIEVEMENTS_CREATION_SUCCESS, {})
+      this.bot?.sendMessage(logChatId, `Пользователь ${user.username} (${chatId}) достиг чего-то  "${goal.title}" (${goal._id})`)
       this.botContext?.clearContext(chatId)
       this.botContext?.clearActiveGoal(chatId)
     } else {
@@ -327,10 +396,18 @@ export class TelegramBotWrapper {
     await chat.save()
   }
 
-  private async getUserByChatID (chatId: number) {
-    const user = await User.findOne({
+  private async getUserByChatID (chatId: number, username?: string) {
+    let user = await User.findOne({
       'chatId': chatId,
     }).populate('goals')
+
+    if (!user) {
+      user = new User()
+      user.chatId = chatId
+      user.username = username || 'Noname'
+      user.goals = []
+      await user.save()
+    }
 
     return user
   }
@@ -382,6 +459,40 @@ export class TelegramBotWrapper {
     }
 
     return message
+  }
+
+  private getGoalsList (goals: IGoal[], current: number, maxpage: number) {
+    const keys: object[][] = []
+    for (let i = 0; i < goals.length; i++) {
+      if (i % 2 === 0) {
+        keys.push([])
+      }
+      keys[keys.length - 1].push({
+        text: goals[i].title?.length > 50 ? goals[i].title.substring(0, 50) + '...' : goals[i].title,
+        callback_data: `goals-list-item_${goals[i].customID}`,
+      })
+    }
+
+    const controls: { text: string, callback_data: string }[] = []
+    if (current > 1) {
+      controls.push({
+        text: '«',
+        callback_data: `goals-list-page_${current - 1}`,
+      })
+    }
+    if (current < maxpage) {
+      controls.push({
+        text: `${maxpage}»`,
+        callback_data: `goals-list-page_${current + 1}`,
+      })
+    }
+    keys.push(controls)
+
+    return {
+      reply_markup: {
+        inline_keyboard: keys,
+      },
+    }
   }
 
   private getPagination( current: number, maxpage: number, type = 'goals' ) {

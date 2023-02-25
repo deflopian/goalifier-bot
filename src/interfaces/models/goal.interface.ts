@@ -1,11 +1,11 @@
-import { Model, Types } from 'mongoose'
+import { Schema, model,Document, Model, Types } from 'mongoose'
 
-export interface IGoal {
-  _id: Types.ObjectId
+export interface IGoal extends Document {
   user: Types.ObjectId
   createdAt: Date
   title: string
   description: string
+  customID: string
 
   from: Date
   till: Date
@@ -17,16 +17,7 @@ export interface IGoal {
   }]
 }
 
-export interface IGoalShort {
-  title: string
-  description: string
-  from: Date,
-  till: Date,
-}
-
-export interface IGoalMethods {
+export interface GoalModel extends Model<IGoal> {
+  save(): Promise<GoalModel>
   isActive(): boolean
-  save(): Promise<IGoal>
 }
-
-export type GoalModel = Model<IGoal, unknown, IGoalMethods>

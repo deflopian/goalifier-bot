@@ -1,9 +1,9 @@
-import { IGoal, IGoalMethods, GoalModel } from '../interfaces/models/goal.interface'
-import mongoose from 'mongoose'
+import { IGoal, GoalModel } from '../interfaces/models/goal.interface'
+import { Schema, model } from 'mongoose'
 
-const ObjectId = mongoose.Schema.Types.ObjectId
+const ObjectId = Schema.Types.ObjectId
 
-const GoalSchema = new mongoose.Schema<IGoal, GoalModel, IGoalMethods>({
+const GoalSchema: Schema<IGoal> = new Schema({
   user: {
     type: ObjectId,
     ref: 'User',
@@ -23,6 +23,10 @@ const GoalSchema = new mongoose.Schema<IGoal, GoalModel, IGoalMethods>({
   },
   title: {
     type: String,
+  },
+  customID: {
+    type: String,
+    default: null,
   },
   description: {
     type: String,
@@ -53,4 +57,4 @@ GoalSchema.methods.isActive = function () {
   return isValid
 }
 
-export const Goal = mongoose.model<IGoal, GoalModel>('Goal', GoalSchema)
+export const Goal = model<IGoal, GoalModel>('Goal', GoalSchema)
