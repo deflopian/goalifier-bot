@@ -12,6 +12,9 @@ import { TGChat } from '../models/tg-chat.model'
 import { GoalModel, IGoal } from '../interfaces/models/goal.interface'
 import { customAlphabet } from 'nanoid'
 import mongoose from 'mongoose'
+import { GoalsMenu } from './goals-menu'
+import { GoalActionsMenu } from './goal-actions-menu'
+import { IKeyboardMarkup } from 'src/interfaces/classes/goal-btn.interface'
 
 const getRandID = customAlphabet('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-0123456789', 16)
 
@@ -40,7 +43,7 @@ export class TelegramBotWrapper {
         this.bot.onText(/\/start(.*)/, this.onStart.bind(this)) // TG_COMMANDS.START
         this.bot.onText(/\/goals(.*)/, this.getGoals.bind(this)) // TG_COMMANDS.GOALS
         this.bot.onText(/\/create(.*)/, this.createGoal.bind(this)) // TG_COMMANDS.GOALS
-        this.bot.onText(/\/log(.*)/, this.addProgress.bind(this)) // TG_COMMANDS.GOALS
+        this.bot.onText(/\/log(.*)/, this.logProgress.bind(this)) // TG_COMMANDS.GOALS
         this.bot.onText(/\/progress(.*)/, this.getGoalProgress.bind(this)) // TG_COMMANDS.PROGRESS
         this.bot.on('callback_query', this.onCallbackQuery.bind(this)) // TG_COMMANDS.PARCELS
         this.bot.on('message', this.onMessage.bind(this))
@@ -168,23 +171,45 @@ export class TelegramBotWrapper {
       return
     }
 
-    this.botContext?.setContext(chatId, TGContextTypes.WAITING_FOR_GOAL_TITLE)
+    this.botContext?.setContext(chatId, TGContextTypes.GOAL_WAITING_FOR_TITLE)
     this.sendL10NMessage(msg, L10nTypes.GOALS_CREATION_WAITING_FOR_TITLE, { parse_mode: 'HTML' as ParseMode })
   }
 
-  private async addProgress(msg, match) {
+  private async logProgress(msg, match) {
     const chatId = msg.chat.id
     this.botContext?.clearContext(chatId)
     const user = await this.getUserByChatID(chatId, msg.chat.username)
 
-    this.botContext?.setContext(chatId, TGContextTypes.WAITING_FOR_ACHIEVEMENT_GOAL_SELECTION)
+    this.botContext?.setContext(chatId, TGContextTypes.ACHIEVEMENT_WAITING_FOR_GOAL_SELECTION)
 
-    const keyboard = await this.drawGoalKeyboard(user._id, 1)
-    console.log(keyboard.reply_markup)
+    const keyboard = await this.getGoalsMenuMarkup(user._id, 1)
     const options = Object.assign(keyboard, { reply_to_message_id: msg.message_id })
-    console.log(options)
 
     this.sendL10NMessage(msg, L10nTypes.ACHIEVEMENTS_CREATION_WAITING_FOR_GOAL, {}, options)
+  }
+
+  private async sendGoalInformation(msg: TelegramBot.Message, keyboardMarkup: IKeyboardMarkup) {
+    const chatId = msg.chat.id
+    const goal = this.botContext?.getActiveGoal(chatId)
+    if (!goal) {
+      return
+    }
+
+    const lang = this.getLang(msg)
+
+    let text = ''
+    const from = goal.from.toJSON().slice(0, 10)
+    const till = goal.till.toJSON().slice(0, 10)
+    text += `${messages[lang][L10nTypes.FIELDS_GOAL_TITLE]}: ${goal.title}`
+    if (goal.description) {
+      text += `\n${messages[lang][L10nTypes.FIELDS_GOAL_DESCRIPTION]}:`
+      text += `\n${goal.description}`
+    }
+    text += `\nНачало: ${from} \nЗавершение: ${till}`
+
+    const options = Object.assign(keyboardMarkup, { parse_mode: 'HTML' as ParseMode })
+
+    this.sendMessage(chatId, text, options)
   }
 
   private getLang(msg: TelegramBot.Message) {
@@ -203,17 +228,30 @@ export class TelegramBotWrapper {
     return language
   }
 
-  private async drawGoalKeyboard(userId: object, pageNumber: number) {
+  private async getGoalsMenuMarkup(userId: object, pageNumber: number) {
     const goals = await Goal.find({
+        user: userId,
+        deleted: false,
+      })
+      .skip((pageNumber - 1) * 4)
+      .limit(4)
+
+    const itemsCount = await Goal.count({
       user: userId,
       deleted: false,
     })
-    const itemsCount = goals.length
 
-    return this.getGoalsList(goals.slice((pageNumber - 1) * 4, pageNumber * 4), pageNumber, Math.ceil(itemsCount / 4))
+    const menu = new GoalsMenu(goals.slice((pageNumber - 1) * 4, pageNumber * 4), pageNumber, Math.ceil(itemsCount / 4))
+    return menu.getMarkup()
   }
 
-  private async setContextGoalForAchievment(msg, userId: object, goalCustomID: string) {
+  private getGoalActionsMenuMarkup(goal: IGoal, lang: Languages): IKeyboardMarkup {
+    const menu = new GoalActionsMenu(goal, lang)
+
+    return menu.getMarkup()
+  }
+
+  private async setContextGoalForAchievement(msg, userId: object, goalCustomID: string) {
     const goal = await Goal.findOne({
       user: userId,
       customID: goalCustomID,
@@ -227,7 +265,22 @@ export class TelegramBotWrapper {
 
     this.botContext?.setActiveGoal(msg.chat.id, goal)
     this.botContext?.setContext(msg.chat.id, TGContextTypes.WAITING_FOR_ACHIEVEMENT)
-    this.sendL10NMessage(msg, L10nTypes.ACHIEVEMENTS_CREATION_WAITING_FOR_TEXT, {}, { parse_mode: 'HTML' as ParseMode })
+  }
+
+  private async setContextGoal(msg, userId: object, goalCustomID: string) {
+    const goal = await Goal.findOne({
+      user: userId,
+      customID: goalCustomID,
+      deleted: false,
+    })
+
+    if (!goal) {
+      this.sendL10NMessage(msg, L10nTypes.GOAL_NOT_FOUND, {}, { parse_mode: 'HTML' as ParseMode })
+      return
+    }
+
+    this.botContext?.setActiveGoal(msg.chat.id, goal)
+    this.botContext?.setContext(msg.chat.id, TGContextTypes.WAITING_FOR_GOAL_ACTION)
   }
 
   private async onCallbackQuery(messageInfo) {
@@ -241,18 +294,36 @@ export class TelegramBotWrapper {
     if (!user) {
       return
     }
+
     const msg = messageInfo.message
-    const btnData = messageInfo.data || 'goals_1'
+    const btnData = messageInfo.data || 'page_1'
     const parts = btnData.split('_')
-    const type = parts[0] || 'goals'
+    const type = parts[0] || 'page'
     const pageNumber = parseInt(parts[1])
     let keyboard: object = {}
 
-    if (this.botContext?.is(chatId, TGContextTypes.WAITING_FOR_ACHIEVEMENT_GOAL_SELECTION)) {
-      if (type === 'goals-list-page') {
-        keyboard = await this.drawGoalKeyboard(user._id, pageNumber)
-      } else if (type === 'goals-list-item') {
-        this.setContextGoalForAchievment(msg, user._id, parts[1])
+    if (this.botContext?.is(chatId, TGContextTypes.ACHIEVEMENT_WAITING_FOR_GOAL_SELECTION)) {
+      if (type === 'page') {
+        keyboard = await this.getGoalsMenuMarkup(user._id, pageNumber)
+      } else if (type === 'item') {
+        this.setContextGoalForAchievement(msg, user._id, parts[1])
+        this.sendL10NMessage(msg, L10nTypes.ACHIEVEMENTS_CREATION_WAITING_FOR_TEXT, {}, { parse_mode: 'HTML' as ParseMode })
+        return
+      }
+    } else if (this.botContext?.is(chatId, TGContextTypes.GOALS_WAITING_FOR_GOAL_SELECTION)) {
+      if (type === 'page') {
+        keyboard = await this.getGoalsMenuMarkup(user._id, pageNumber)
+      } else if (type === 'item') {
+        await this.setContextGoal(msg, user._id, parts[1])
+
+        const goal = this.botContext?.getActiveGoal(chatId)
+        if (!goal) {
+          this.sendL10NMessage(msg, L10nTypes.GOAL_NOT_FOUND, {}, { parse_mode: 'HTML' as ParseMode })
+          return
+        }
+
+        const keyboard = this.getGoalActionsMenuMarkup(goal, this.getLang(msg))
+        this.sendGoalInformation(msg, keyboard)
         return
       }
     }
@@ -304,7 +375,7 @@ export class TelegramBotWrapper {
       return // Всё в порядке, действий не требуется
     }
 
-    if (this.botContext?.is(chatId, TGContextTypes.WAITING_FOR_GOAL_TITLE)) {
+    if (this.botContext?.is(chatId, TGContextTypes.GOAL_WAITING_FOR_TITLE)) {
       const goal = new Goal()
       goal.title = msg.text.length > 100 ? msg.text.substring(0, 100) + '...' : msg.text
       goal.customID = getRandID(16)
@@ -318,12 +389,12 @@ export class TelegramBotWrapper {
       goal.till = date
 
       await goal.save()
-      this.botContext?.setContext(chatId, TGContextTypes.WAITING_FOR_GOAL_DESCRIPTION)
+      this.botContext?.setContext(chatId, TGContextTypes.GOAL_WAITING_FOR_DESCRIPTION)
       this.botContext?.setActiveGoal(chatId, goal)
 
       this.sendL10NMessage(msg, L10nTypes.GOALS_CREATION_WAITING_FOR_DESCRIPTION, {})
       this.bot?.sendMessage(logChatId, `Пользователь ${user.username} (${chatId}) создал новую цель "${goal.title}" (${goal._id})`)
-    } else if (this.botContext?.is(chatId, TGContextTypes.WAITING_FOR_GOAL_DESCRIPTION)) {
+    } else if (this.botContext?.is(chatId, TGContextTypes.GOAL_WAITING_FOR_DESCRIPTION)) {
       const goal = this.botContext?.getActiveGoal(chatId)
       if (!goal) {
         return
@@ -331,12 +402,12 @@ export class TelegramBotWrapper {
       goal.description = msg.text.length > 500 ? msg.text.substring(0, 500) + '...' : msg.onText
 
       await goal.save()
-      this.botContext?.setContext(chatId, TGContextTypes.WAITING_FOR_GOAL_TILL)
+      this.botContext?.setContext(chatId, TGContextTypes.GOAL_WAITING_FOR_TILL)
 
       this.sendL10NMessage(msg, L10nTypes.GOALS_CREATION_WAITING_FOR_TILL, {
         date: goal.from.toJSON().slice(0, 10),
       })
-    } else if (this.botContext?.is(chatId, TGContextTypes.WAITING_FOR_GOAL_FROM)) {
+    } else if (this.botContext?.is(chatId, TGContextTypes.GOAL_WAITING_FOR_FROM)) {
       const goal = this.botContext?.getActiveGoal(chatId)
       if (!goal) {
         return
@@ -344,12 +415,12 @@ export class TelegramBotWrapper {
       goal.from = new Date(msg.text)
 
       await goal.save()
-      this.botContext?.setContext(chatId, TGContextTypes.WAITING_FOR_GOAL_TILL)
+      this.botContext?.setContext(chatId, TGContextTypes.GOAL_WAITING_FOR_TILL)
 
       this.sendL10NMessage(msg, L10nTypes.GOALS_CREATION_WAITING_FOR_TILL, {
         date: goal.till.toJSON().slice(0, 10),
       })
-    } else if (this.botContext?.is(chatId, TGContextTypes.WAITING_FOR_GOAL_TILL)) {
+    } else if (this.botContext?.is(chatId, TGContextTypes.GOAL_WAITING_FOR_TILL)) {
       const goal = this.botContext?.getActiveGoal(chatId)
       if (!goal) {
         return
@@ -477,7 +548,7 @@ export class TelegramBotWrapper {
       }
       keys[keys.length - 1].push({
         text: goals[i].title?.length > 50 ? goals[i].title.substring(0, 50) + '...' : goals[i].title,
-        // callback_data: `goals-list-item_${goals[i].customID}`,
+        callback_data: `goals-list-item_${goals[i].customID}`,
       })
       // keys[keys.length - 1].push(goals[i].customID + ': ' + (goals[i].title?.length > 50 ? goals[i].title.substring(0, 50) + '...' : goals[i].title))
     }
