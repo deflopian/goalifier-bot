@@ -3,7 +3,7 @@ import Languages from '../utils/languages.enum'
 import { IGoal } from '../interfaces/models/goal.interface'
 import { TGBtn } from './tg-btn'
 import messages from '../utils/tg-messages.enum'
-import L10nTypes from 'src/utils/l10n-types.enum'
+import L10nTypes from '../utils/l10n-types.enum'
 
 export class GoalActionsMenu {
   private btns: TGBtn[]

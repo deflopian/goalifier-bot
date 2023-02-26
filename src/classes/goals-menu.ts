@@ -1,4 +1,4 @@
-import { IBtnMarkup } from 'src/interfaces/classes/goal-btn.interface'
+import { IBtnMarkup } from '../interfaces/classes/goal-btn.interface'
 import { IGoal } from '../interfaces/models/goal.interface'
 import { TGBtn } from './tg-btn'
 

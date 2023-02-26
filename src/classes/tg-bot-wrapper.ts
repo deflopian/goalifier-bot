@@ -14,7 +14,7 @@ import { customAlphabet } from 'nanoid'
 import mongoose from 'mongoose'
 import { GoalsMenu } from './goals-menu'
 import { GoalActionsMenu } from './goal-actions-menu'
-import { IKeyboardMarkup } from 'src/interfaces/classes/goal-btn.interface'
+import { IKeyboardMarkup } from '../interfaces/classes/goal-btn.interface'
 
 const getRandID = customAlphabet('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-0123456789', 16)
 
